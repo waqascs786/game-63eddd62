@@ -18,25 +18,27 @@ class _GameScreenState extends State<GameScreen> {
   @override
   void initState() {
     super.initState();
-    _iap.initialize();
-    _iap.loadProducts(widget.config.coinPacks.map((p) => p.id).toList());
+    if (widget.config.iapEnabled) {
+      _iap.initialize();
+      _iap.loadProducts(widget.config.coinPacks.map((p) => p.id).toList());
+    }
   }
 
   @override
   void dispose() {
-    _iap.dispose();
+    if (widget.config.iapEnabled) _iap.dispose();
     super.dispose();
   }
 
   void _onLevelComplete(int coinsEarned) {
     setState(() {
-      _coins += coinsEarned;
+      if (widget.config.iapEnabled) _coins += coinsEarned;
       _currentLevel++;
     });
   }
 
   void _onHintUsed() {
-    if (_coins >= 20) {
+    if (widget.config.iapEnabled && _coins >= 20) {
       setState(() => _coins -= 20);
     }
   }
@@ -60,6 +62,7 @@ class _GameScreenState extends State<GameScreen> {
         config: widget.config,
         currentLevel: _currentLevel,
         coins: _coins,
+        iapEnabled: widget.config.iapEnabled,
         onLevelComplete: _onLevelComplete,
         onHintUsed: _onHintUsed,
         onNavigatePrev: _currentLevel > 0 ? _onPrevLevel : null,
