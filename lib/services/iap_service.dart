@@ -19,6 +19,7 @@ class IAPService {
   List<ProductDetails> get products => _products;
   bool get isAvailable => _isAvailable;
   int get coins => _coins;
+  VoidCallback? onPurchased;
 
   static const List<String> coinProductIds = [
     'coins1', 'coins2', 'coins3', 'coins4',
@@ -78,6 +79,7 @@ class IAPService {
         _iap.completePurchase(purchase);
       }
     }
+    onPurchased?.call();
   }
 
   Future<void> _loadBalance() async {
