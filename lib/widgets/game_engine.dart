@@ -15,6 +15,7 @@ class GameEngine extends StatefulWidget {
   final Function(int) onLevelComplete;
   final VoidCallback onHintUsed;
   final Function(int) onSpendCoins;
+  final Function(String)? onBuyCoins;
   final VoidCallback? onNavigatePrev;
   final VoidCallback? onNavigateNext;
 
@@ -27,6 +28,7 @@ class GameEngine extends StatefulWidget {
     required this.onLevelComplete,
     required this.onHintUsed,
     required this.onSpendCoins,
+    this.onBuyCoins,
     this.onNavigatePrev,
     this.onNavigateNext,
   });
@@ -97,7 +99,7 @@ class _GameEngineState extends State<GameEngine> with SingleTickerProviderStateM
     _usedLetterIndices = [];
     _typedAnswer = '';
     final packLevels = _currentPackLevels;
-    final idx = _hasPacks ? _internalLevelIndex : widget.currentLevel;
+    final idx = _internalLevelIndex;
     if (_screen == _Screen.playing && packLevels.isNotEmpty && idx < packLevels.length) {
       final level = packLevels[idx];
       final qType = level.questionType;
@@ -130,7 +132,7 @@ class _GameEngineState extends State<GameEngine> with SingleTickerProviderStateM
     if (widget.config.levels.isEmpty) return _emptyScreen();
     final packLevels = _currentPackLevels;
     if (packLevels.isEmpty) return _emptyScreen();
-    final idx = _hasPacks ? _internalLevelIndex : widget.currentLevel;
+    final idx = _internalLevelIndex;
     if (idx >= packLevels.length) return _allDoneScreen();
     final level = packLevels[idx];
     final qType = level.questionType;
@@ -1090,7 +1092,7 @@ class _GameEngineState extends State<GameEngine> with SingleTickerProviderStateM
 
   Widget _buildHeader() {
     final packLevels = _currentPackLevels;
-    final idx = _hasPacks ? _internalLevelIndex : widget.currentLevel;
+    final idx = _internalLevelIndex;
     final hasPrev = _hasPacks ? idx > 0 : widget.onNavigatePrev != null;
     final hasNext = _hasPacks ? idx < packLevels.length - 1 : widget.onNavigateNext != null;
     return Padding(
@@ -1221,7 +1223,7 @@ class _GameEngineState extends State<GameEngine> with SingleTickerProviderStateM
 
   Widget _buildCompleteScreen() {
     final packLevels = _currentPackLevels;
-    final idx = _hasPacks ? _internalLevelIndex : widget.currentLevel;
+    final idx = _internalLevelIndex;
     final level = idx < packLevels.length ? packLevels[idx] : packLevels.last;
     final isLast = idx >= packLevels.length - 1;
     return Center(
@@ -1328,7 +1330,11 @@ class _GameEngineState extends State<GameEngine> with SingleTickerProviderStateM
                       ),
                       ElevatedButton(
                         onPressed: () {
-                          widget.onSpendCoins(-(pack['coins'] as int));
+                          if (widget.onBuyCoins != null) {
+                            widget.onBuyCoins!(pack['id'] as String);
+                          } else {
+                            widget.onSpendCoins(-(pack['coins'] as int));
+                          }
                         },
                         style: ElevatedButton.styleFrom(backgroundColor: _getColor('primary')),
                         child: Text(pack['price'] as String, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
@@ -1361,7 +1367,7 @@ class _GameEngineState extends State<GameEngine> with SingleTickerProviderStateM
 
   void _useHint() {
     final packLevels = _currentPackLevels;
-    final idx = _hasPacks ? _internalLevelIndex : widget.currentLevel;
+    final idx = _internalLevelIndex;
     if (idx >= packLevels.length) return;
     final answer = packLevels[idx].answer.toUpperCase();
     if (_currentAnswer.length < answer.length) {
