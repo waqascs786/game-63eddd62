@@ -1328,7 +1328,7 @@ class _GameEngineState extends State<GameEngine> with SingleTickerProviderStateM
                       ),
                       ElevatedButton(
                         onPressed: () {
-                          widget.onLevelComplete(pack['coins'] as int);
+                          widget.onSpendCoins(-(pack['coins'] as int));
                         },
                         style: ElevatedButton.styleFrom(backgroundColor: _getColor('primary')),
                         child: Text(pack['price'] as String, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
