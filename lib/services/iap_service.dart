@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class IAPService {
   static final IAPService _instance = IAPService._internal();
@@ -11,35 +13,92 @@ class IAPService {
   StreamSubscription<List<PurchaseDetails>>? _subscription;
   List<ProductDetails> _products = [];
   bool _isAvailable = false;
+  int _coins = 100;
+  String? _gameId;
+  String? _userId;
 
   List<ProductDetails> get products => _products;
   bool get isAvailable => _isAvailable;
+  int get coins => _coins;
 
-  Future<void> initialize() async {
-    _isAvailable = await _iap.isAvailable();
-    if (!_isAvailable) return;
-    _subscription = _iap.purchaseStream.listen(_onPurchaseUpdate, onDone: () => _subscription?.cancel(), onError: (e) => debugPrint('IAP error: ' + e.toString()));
+  static const List<String> coinProductIds = [
+    'coins1', 'coins2', 'coins3', 'coins4',
+  ];
+
+  static int coinsForProduct(String id) {
+    switch (id) {
+      case 'coins1': return 1000;
+      case 'coins2': return 2500;
+      case 'coins3': return 5000;
+      case 'coins4': return 10000;
+      default: return 0;
+    }
   }
 
-  Future<void> loadProducts(List<String> ids) async {
-    if (!_isAvailable || ids.isEmpty) return;
-    final response = await _iap.queryProductDetails(ids.toSet());
+  Future<void> initialize({String? gameId}) async {
+    _gameId = gameId;
+    _userId = FirebaseAuth.instance.currentUser?.uid;
+    await _loadBalance();
+    if (!kIsWeb) {
+      _isAvailable = await _iap.isAvailable();
+      if (!_isAvailable) return;
+      _subscription = _iap.purchaseStream.listen(_onPurchaseUpdate, onDone: () => _subscription?.cancel(), onError: (e) => debugPrint('IAP error: ' + e.toString()));
+    }
+  }
+
+  Future<void> loadProducts() async {
+    if (kIsWeb || !_isAvailable) return;
+    final response = await _iap.queryProductDetails(coinProductIds.toSet());
     _products = response.productDetails;
   }
 
-  Future<void> buyProduct(ProductDetails product) async {
-    if (!_isAvailable) return;
-    await _iap.buyNonConsumable(purchaseParam: PurchaseParam(productDetails: product));
+  Future<void> buyCoins(ProductDetails product) async {
+    if (kIsWeb || !_isAvailable) return;
+    await _iap.buyConsumable(purchaseParam: PurchaseParam(productDetails: product));
+  }
+
+  Future<void> addCoins(int amount) async {
+    _coins += amount;
+    await _saveBalance();
+  }
+
+  Future<bool> spendCoins(int amount) async {
+    if (_coins < amount) return false;
+    _coins -= amount;
+    await _saveBalance();
+    return true;
   }
 
   void _onPurchaseUpdate(List<PurchaseDetails> purchases) {
     for (final purchase in purchases) {
       if (purchase.status == PurchaseStatus.purchased || purchase.status == PurchaseStatus.restored) {
-        debugPrint('Purchased: ' + purchase.productID);
+        final coins = coinsForProduct(purchase.productID);
+        if (coins > 0) addCoins(coins);
       }
       if (purchase.pendingCompletePurchase) {
         _iap.completePurchase(purchase);
       }
+    }
+  }
+
+  Future<void> _loadBalance() async {
+    if (_userId == null || _gameId == null) return;
+    try {
+      final doc = await FirebaseFirestore.instance.collection('games').doc(_gameId).collection('users').doc(_userId).get();
+      if (doc.exists && doc.data()?['coins'] != null) {
+        _coins = doc.data()!['coins'] as int;
+      }
+    } catch (e) {
+      debugPrint('Failed to load coin balance: ' + e.toString());
+    }
+  }
+
+  Future<void> _saveBalance() async {
+    if (_userId == null || _gameId == null) return;
+    try {
+      await FirebaseFirestore.instance.collection('games').doc(_gameId).collection('users').doc(_userId).set({'coins': _coins}, SetOptions(merge: true));
+    } catch (e) {
+      debugPrint('Failed to save coin balance: ' + e.toString());
     }
   }
 
