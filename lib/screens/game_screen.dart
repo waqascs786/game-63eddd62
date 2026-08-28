@@ -20,7 +20,7 @@ class _GameScreenState extends State<GameScreen> {
     super.initState();
     if (widget.config.iapEnabled) {
       _iap.initialize();
-      _iap.loadProducts(widget.config.coinPacks.map((p) => p.id).toList());
+      _iap.loadProducts();
     }
   }
 
@@ -41,6 +41,10 @@ class _GameScreenState extends State<GameScreen> {
     if (widget.config.iapEnabled && _coins >= 20) {
       setState(() => _coins -= 20);
     }
+  }
+
+  void _onSpendCoins(int amount) {
+    setState(() { _coins -= amount; });
   }
 
   void _onPrevLevel() {
@@ -65,6 +69,7 @@ class _GameScreenState extends State<GameScreen> {
         iapEnabled: widget.config.iapEnabled,
         onLevelComplete: _onLevelComplete,
         onHintUsed: _onHintUsed,
+        onSpendCoins: _onSpendCoins,
         onNavigatePrev: _currentLevel > 0 ? _onPrevLevel : null,
         onNavigateNext: _currentLevel < widget.config.levels.length - 1 ? _onNextLevel : null,
       ),
