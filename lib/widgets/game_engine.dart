@@ -5,14 +5,16 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import '../models/game_config.dart';
 
-enum _Screen { packSelect, levelSelect, playing, complete }
+enum _Screen { packSelect, levelSelect, playing, complete, buyCoins }
 
 class GameEngine extends StatefulWidget {
   final GameConfig config;
   final int currentLevel;
   final int coins;
+  final bool iapEnabled;
   final Function(int) onLevelComplete;
   final VoidCallback onHintUsed;
+  final Function(int) onSpendCoins;
   final VoidCallback? onNavigatePrev;
   final VoidCallback? onNavigateNext;
 
@@ -21,8 +23,10 @@ class GameEngine extends StatefulWidget {
     required this.config,
     required this.currentLevel,
     required this.coins,
+    this.iapEnabled = true,
     required this.onLevelComplete,
     required this.onHintUsed,
+    required this.onSpendCoins,
     this.onNavigatePrev,
     this.onNavigateNext,
   });
@@ -112,11 +116,13 @@ class _GameEngineState extends State<GameEngine> with SingleTickerProviderStateM
       color: _getColor('background'),
       child: _showComplete
           ? _buildCompleteScreen()
-          : _screen == _Screen.packSelect
-              ? _buildPackSelectScreen()
-              : _screen == _Screen.levelSelect
-                  ? _buildLevelSelectScreen()
-                  : _buildGameScreen(),
+          : _screen == _Screen.buyCoins && widget.iapEnabled
+              ? _buildBuyCoinsScreen()
+              : _screen == _Screen.packSelect
+                  ? _buildPackSelectScreen()
+                  : _screen == _Screen.levelSelect
+                      ? _buildLevelSelectScreen()
+                      : _buildGameScreen(),
     );
   }
 
@@ -939,7 +945,26 @@ class _GameEngineState extends State<GameEngine> with SingleTickerProviderStateM
                 final iconUrl = pack.iconUrl;
                 final levelCount = pack.levelIds.length;
                 return GestureDetector(
-                  onTap: locked ? null : () => setState(() { _selectedPackId = pack.id; _screen = _Screen.levelSelect; }),
+                  onTap: locked
+                      ? () {
+                          if (!widget.iapEnabled) {
+                            setState(() {
+                              pack.locked = false;
+                              _selectedPackId = pack.id;
+                              _screen = _Screen.levelSelect;
+                            });
+                          } else if (widget.coins >= 500) {
+                            widget.onSpendCoins(500);
+                            setState(() {
+                              pack.locked = false;
+                              _selectedPackId = pack.id;
+                              _screen = _Screen.levelSelect;
+                            });
+                          } else {
+                            setState(() { _screen = _Screen.buyCoins; });
+                          }
+                        }
+                      : () => setState(() { _selectedPackId = pack.id; _screen = _Screen.levelSelect; }),
                   child: Container(
                     decoration: BoxDecoration(
                       color: locked ? const Color(0xFF21262D) : const Color(0xFF161B22),
@@ -954,7 +979,7 @@ class _GameEngineState extends State<GameEngine> with SingleTickerProviderStateM
                                 errorBuilder: (_, __, ___) => Icon(locked ? Icons.lock : Icons.inventory_2, size: 32, color: Colors.grey)))
                             : Icon(locked ? Icons.lock : Icons.inventory_2, size: 32, color: locked ? Colors.grey : _getColor('primary')),
                         const SizedBox(height: 8),
-                        Text(locked ? 'Locked' : name, style: TextStyle(color: locked ? Colors.grey : Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
+                        Text(locked ? (widget.iapEnabled ? '🔒 500 coins' : 'Tap to unlock') : name, style: TextStyle(color: locked ? Colors.grey : Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
                         if (!locked) Text('$levelCount levels', style: const TextStyle(color: Colors.grey, fontSize: 11)),
                       ],
                     ),
@@ -1087,15 +1112,20 @@ class _GameEngineState extends State<GameEngine> with SingleTickerProviderStateM
             decoration: BoxDecoration(color: _getColor('primary'), borderRadius: BorderRadius.circular(6)),
             child: Text('Level: ${idx + 1}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
           ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(color: _getColor('secondary'), borderRadius: BorderRadius.circular(6)),
-            child: Row(children: [
-              const Icon(Icons.monetization_on, color: Colors.white, size: 16),
-              const SizedBox(width: 4),
-              Text('${widget.coins}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-            ]),
-          ),
+          if (widget.iapEnabled) ...[
+            GestureDetector(
+              onTap: () => setState(() { _screen = _Screen.buyCoins; }),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(color: _getColor('secondary'), borderRadius: BorderRadius.circular(6)),
+                child: Row(children: [
+                  const Icon(Icons.monetization_on, color: Colors.white, size: 16),
+                  const SizedBox(width: 4),
+                  Text('${widget.coins}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                ]),
+              ),
+            ),
+          ],
           GestureDetector(
             onTap: hasNext ? () {
               setState(() {
@@ -1180,8 +1210,8 @@ class _GameEngineState extends State<GameEngine> with SingleTickerProviderStateM
             style: ElevatedButton.styleFrom(backgroundColor: _getColor('secondary')),
           ),
           ElevatedButton.icon(
-            onPressed: widget.coins >= 20 ? () { widget.onHintUsed(); _useHint(); } : null,
-            icon: const Icon(Icons.lightbulb, size: 18), label: const Text('Hints (20)'),
+            onPressed: widget.iapEnabled ? (widget.coins >= 5 ? () { widget.onHintUsed(); _useHint(); } : null) : () { widget.onHintUsed(); _useHint(); },
+            icon: const Icon(Icons.lightbulb, size: 18), label: Text(widget.iapEnabled ? 'Hints (5)' : 'Hints'),
             style: ElevatedButton.styleFrom(backgroundColor: _getColor('primary')),
           ),
         ],
@@ -1205,10 +1235,12 @@ class _GameEngineState extends State<GameEngine> with SingleTickerProviderStateM
           const SizedBox(height: 24),
           const Text('Well Done!', style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),
-          Text('+${level.coinsReward} coins', style: const TextStyle(color: Color(0xFF00BFA5), fontSize: 20)),
+          if (widget.iapEnabled)
+            Text('+${level.coinsReward} coins', style: const TextStyle(color: Color(0xFF00BFA5), fontSize: 20)),
           const SizedBox(height: 32),
           ElevatedButton(
             onPressed: () {
+              widget.onLevelComplete(level.coinsReward);
               setState(() {
                 _showComplete = false;
                 if (_hasPacks) {
@@ -1221,12 +1253,91 @@ class _GameEngineState extends State<GameEngine> with SingleTickerProviderStateM
                     _initLevel();
                   }
                 } else {
-                  widget.onLevelComplete(level.coinsReward);
+                  _screen = _Screen.levelSelect;
                 }
               });
-              if (!_hasPacks) widget.onLevelComplete(level.coinsReward);
             },
             child: Text(isLast ? 'Back to Levels' : 'Next Level'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ========== BUY COINS ==========
+  Widget _buildBuyCoinsScreen() {
+    final packs = [
+      {'id': 'coins1', 'name': '1000 Coins', 'coins': 1000, 'price': '\$0.99'},
+      {'id': 'coins2', 'name': '2500 Coins', 'coins': 2500, 'price': '\$2.99'},
+      {'id': 'coins3', 'name': '5000 Coins', 'coins': 5000, 'price': '\$4.99'},
+      {'id': 'coins4', 'name': '10000 Coins', 'coins': 10000, 'price': '\$9.99'},
+    ];
+    return Padding(
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              GestureDetector(
+                onTap: () => setState(() {
+                  if (_hasPacks && _selectedPackId != null) {
+                    _screen = _Screen.levelSelect;
+                  } else if (_hasPacks) {
+                    _screen = _Screen.packSelect;
+                  } else {
+                    _screen = _Screen.levelSelect;
+                  }
+                }),
+                child: const Icon(Icons.arrow_back, color: Colors.white, size: 24),
+              ),
+              const SizedBox(width: 12),
+              const Text('Buy Coins', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+              const Spacer(),
+              Text('Balance: ${widget.coins}', style: const TextStyle(color: Color(0xFF00BFA5), fontSize: 14)),
+            ],
+          ),
+          const SizedBox(height: 24),
+          const Text('Buy coins to use hints and unlock packs', style: TextStyle(color: Colors.grey, fontSize: 13)),
+          const SizedBox(height: 16),
+          Expanded(
+            child: ListView.builder(
+              itemCount: packs.length,
+              itemBuilder: (context, index) {
+                final pack = packs[index];
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF21262D),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: (_getColor('primary') ?? Colors.white).withOpacity(0.2)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.monetization_on, color: Color(0xFFFFD700), size: 32),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(pack['name'] as String, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 16)),
+                            const SizedBox(height: 4),
+                            Text('${pack['coins']} coins', style: const TextStyle(color: Color(0xFF00BFA5), fontSize: 13)),
+                          ],
+                        ),
+                      ),
+                      ElevatedButton(
+                        onPressed: () {
+                          widget.onLevelComplete(pack['coins'] as int);
+                        },
+                        style: ElevatedButton.styleFrom(backgroundColor: _getColor('primary')),
+                        child: Text(pack['price'] as String, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
           ),
         ],
       ),
