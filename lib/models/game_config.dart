@@ -9,6 +9,7 @@ class GameConfig {
   final Map<String, dynamic> icon;
   final Map<String, dynamic> settings;
   final List<CoinPackConfig> coinPacks;
+  final bool iapEnabled;
 
   GameConfig({
     required this.id,
@@ -21,6 +22,7 @@ class GameConfig {
     required this.icon,
     required this.settings,
     required this.coinPacks,
+    this.iapEnabled = true,
   });
 
   bool get hasPacks => packs.isNotEmpty;
@@ -37,6 +39,7 @@ class GameConfig {
       icon: Map<String, dynamic>.from(m['icon'] ?? {}),
       settings: Map<String, dynamic>.from(m['settings'] ?? {}),
       coinPacks: (m['coinPacks'] as List?)?.map((p) => CoinPackConfig.fromMap(p)).toList() ?? [],
+      iapEnabled: m['iapEnabled'] ?? true,
     );
   }
 }
