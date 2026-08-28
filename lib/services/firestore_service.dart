@@ -26,6 +26,12 @@ class FirestoreService {
         if (!flat.containsKey('sounds') || flat['sounds'] == null) flat['sounds'] = {};
         if (!flat.containsKey('icon') || flat['icon'] == null) flat['icon'] = {};
         if (!flat.containsKey('settings') || flat['settings'] == null) flat['settings'] = {};
+        final monetization = data['monetization'];
+        if (monetization is Map<String, dynamic>) {
+          flat['iapEnabled'] = monetization['iapEnabled'] ?? true;
+          if (monetization['coinPacks'] != null) flat['coinPacks'] = monetization['coinPacks'];
+        }
+        if (!flat.containsKey('iapEnabled') || flat['iapEnabled'] == null) flat['iapEnabled'] = true;
         return GameConfig.fromMap(flat);
       }
       return null;
