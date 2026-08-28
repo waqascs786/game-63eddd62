@@ -2,7 +2,6 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 
 class IAPService {
   static final IAPService _instance = IAPService._internal();
@@ -35,9 +34,9 @@ class IAPService {
     }
   }
 
-  Future<void> initialize({String? gameId}) async {
+  Future<void> initialize({String? gameId, String? userId}) async {
     _gameId = gameId;
-    _userId = FirebaseAuth.instance.currentUser?.uid;
+    _userId = userId;
     await _loadBalance();
     if (!kIsWeb) {
       _isAvailable = await _iap.isAvailable();
