@@ -84,7 +84,7 @@ class GameLevelPack {
   final String iconUrl;
   final List<String> levelIds;
   final int order;
-  final bool locked;
+  bool locked;
 
   GameLevelPack({
     required this.id, required this.name, this.iconUrl = '',
