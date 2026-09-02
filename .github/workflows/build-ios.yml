@@ -97,34 +97,6 @@ jobs:
           PLIST
           echo "GoogleService-Info.plist created for $BUNDLE_ID"
 
-      - name: Add plist to Xcode project
-        run: |
-          PBXPROJ="ios/Runner.xcodeproj/project.pbxproj"
-          if [ ! -f "$PBXPROJ" ]; then
-            echo "project.pbxproj not found, skipping"
-            exit 0
-          fi
-          if grep -q "GoogleService-Info.plist" "$PBXPROJ"; then
-            echo "Already in project"
-            exit 0
-          fi
-          python3 << "PYEOF"
-          import uuid, re
-          with open("ios/Runner.xcodeproj/project.pbxproj") as f:
-              pbx = f.read()
-          ref = uuid.uuid4().hex[:24].upper()
-          build = uuid.uuid4().hex[:24].upper()
-          file_ref_line = f"\t{ref} /* GoogleService-Info.plist */ = {{isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = \"GoogleService-Info.plist\"; sourceTree = \"<group>\"; }};"
-          build_file_line = f"\t{build} /* GoogleService-Info.plist in Resources */ = {{isa = PBXBuildFile; fileRef = {ref} /* GoogleService-Info.plist */; }};"
-          pbx = pbx.replace("/* End PBXFileReference section */", file_ref_line + "\n/* End PBXFileReference section */")
-          pbx = pbx.replace("/* End PBXBuildFile section */", build_file_line + "\n/* End PBXBuildFile section */")
-          pbx = re.sub(r"(\s*/\* End PBXResourcesBuildPhase section \*/)", f"\t\t\t{build} /* GoogleService-Info.plist in Resources */,\1", pbx)
-          pbx = pbx.replace("path = Runner;", f"path = Runner;\n\t\t\t{ref} /* GoogleService-Info.plist */,")
-          with open("ios/Runner.xcodeproj/project.pbxproj", "w") as f:
-              f.write(pbx)
-          print("Added GoogleService-Info.plist to Xcode project")
-          PYEOF
-
       - name: Get dependencies
         run: flutter pub get
 
