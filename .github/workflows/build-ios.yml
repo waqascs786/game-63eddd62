@@ -63,7 +63,11 @@ jobs:
           <plist version="1.0">
           <dict>
             <key>API_KEY</key>
-            <string>AIzaSyAzN4vJZlYmGVzm8sCsz1bEPawQEiKIc6k</string>
+            <string>AIzaSyD4yk_VkMFcAKhMdM4zQMA-e84utQNb2Fs</string>
+            <key>CLIENT_ID</key>
+            <string>311998863107-j04fkrftlradf4j5eo5uor98138e21ke.apps.googleusercontent.com</string>
+            <key>REVERSED_CLIENT_ID</key>
+            <string>com.googleusercontent.apps.311998863107-j04fkrftlradf4j5eo5uor98138e21ke</string>
             <key>GCM_SENDER_ID</key>
             <string>311998863107</string>
             <key>PLIST_VERSION</key>
@@ -79,19 +83,47 @@ jobs:
             <key>IS_ANALYTICS_ENABLED</key>
             <false/>
             <key>IS_APPINVITE_ENABLED</key>
-            <false/>
+            <true/>
             <key>IS_GCM_ENABLED</key>
-            <false/>
+            <true/>
             <key>IS_SIGNIN_ENABLED</key>
-            <false/>
+            <true/>
             <key>GOOGLE_APP_ID</key>
-            <string>1:311998863107:ios:placeholder</string>
+            <string>1:311998863107:ios:a492472970340e432cfb36</string>
             <key>DATABASE_URL</key>
             <string>https://trivianinja-bff5c.firebaseio.com</string>
           </dict>
           </plist>
           PLIST
           echo "GoogleService-Info.plist created for $BUNDLE_ID"
+
+      - name: Add plist to Xcode project
+        run: |
+          PBXPROJ="ios/Runner.xcodeproj/project.pbxproj"
+          if [ ! -f "$PBXPROJ" ]; then
+            echo "project.pbxproj not found, skipping"
+            exit 0
+          fi
+          if grep -q "GoogleService-Info.plist" "$PBXPROJ"; then
+            echo "Already in project"
+            exit 0
+          fi
+          python3 << "PYEOF"
+          import uuid, re
+          with open("ios/Runner.xcodeproj/project.pbxproj") as f:
+              pbx = f.read()
+          ref = uuid.uuid4().hex[:24].upper()
+          build = uuid.uuid4().hex[:24].upper()
+          file_ref_line = f"\t{ref} /* GoogleService-Info.plist */ = {{isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = \"GoogleService-Info.plist\"; sourceTree = \"<group>\"; }};"
+          build_file_line = f"\t{build} /* GoogleService-Info.plist in Resources */ = {{isa = PBXBuildFile; fileRef = {ref} /* GoogleService-Info.plist */; }};"
+          pbx = pbx.replace("/* End PBXFileReference section */", file_ref_line + "\n/* End PBXFileReference section */")
+          pbx = pbx.replace("/* End PBXBuildFile section */", build_file_line + "\n/* End PBXBuildFile section */")
+          pbx = re.sub(r"(\s*/\* End PBXResourcesBuildPhase section \*/)", f"\t\t\t{build} /* GoogleService-Info.plist in Resources */,\1", pbx)
+          pbx = pbx.replace("path = Runner;", f"path = Runner;\n\t\t\t{ref} /* GoogleService-Info.plist */,")
+          with open("ios/Runner.xcodeproj/project.pbxproj", "w") as f:
+              f.write(pbx)
+          print("Added GoogleService-Info.plist to Xcode project")
+          PYEOF
 
       - name: Get dependencies
         run: flutter pub get
